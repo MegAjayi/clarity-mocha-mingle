@@ -24,3 +24,37 @@ Clarinet.test({
     assertEquals(block.receipts[0].result.expectOk(), '0');
   },
 });
+
+Clarinet.test({
+  name: "Ensure rating validation works correctly",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get("deployer")!;
+    
+    // First create a recipe
+    let block = chain.mineBlock([
+      Tx.contractCall("recipe", "create-recipe", [
+        types.utf8("Test Recipe"),
+        types.utf8("Test Ingredients"),
+        types.utf8("Test Instructions")
+      ], deployer.address)
+    ]);
+    
+    // Try invalid rating (0)
+    block = chain.mineBlock([
+      Tx.contractCall("recipe", "rate-recipe", [
+        types.uint(0),
+        types.uint(0)
+      ], deployer.address)
+    ]);
+    block.receipts[0].result.expectErr();
+
+    // Try valid rating
+    block = chain.mineBlock([
+      Tx.contractCall("recipe", "rate-recipe", [
+        types.uint(0),
+        types.uint(5)
+      ], deployer.address)
+    ]);
+    block.receipts[0].result.expectOk();
+  },
+});
