@@ -2,7 +2,7 @@ import { Clarinet, Chain, Account, Tx, types } from 'https://deno.land/x/clarine
 import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
 Clarinet.test({
-  name: "Ensure user can create a recipe",
+  name: "Ensure user can create a recipe with valid inputs",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const deployer = accounts.get("deployer")!;
     const recipe = {
@@ -19,9 +19,24 @@ Clarinet.test({
       ], deployer.address)
     ]);
     
-    assertEquals(block.receipts.length, 1);
-    assertEquals(block.height, 2);
     assertEquals(block.receipts[0].result.expectOk(), '0');
+  },
+});
+
+Clarinet.test({
+  name: "Ensure empty inputs are rejected",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    const deployer = accounts.get("deployer")!;
+    
+    const block = chain.mineBlock([
+      Tx.contractCall("recipe", "create-recipe", [
+        types.utf8(""),
+        types.utf8("ingredients"),
+        types.utf8("instructions")
+      ], deployer.address)
+    ]);
+    
+    block.receipts[0].result.expectErr(400);
   },
 });
 
@@ -29,8 +44,9 @@ Clarinet.test({
   name: "Ensure rating validation works correctly",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const deployer = accounts.get("deployer")!;
+    const user2 = accounts.get("wallet_1")!;
     
-    // First create a recipe
+    // Create recipe
     let block = chain.mineBlock([
       Tx.contractCall("recipe", "create-recipe", [
         types.utf8("Test Recipe"),
@@ -44,16 +60,25 @@ Clarinet.test({
       Tx.contractCall("recipe", "rate-recipe", [
         types.uint(0),
         types.uint(0)
-      ], deployer.address)
+      ], user2.address)
     ]);
-    block.receipts[0].result.expectErr();
+    block.receipts[0].result.expectErr(400);
 
-    // Try valid rating
+    // Try self-rating
     block = chain.mineBlock([
       Tx.contractCall("recipe", "rate-recipe", [
         types.uint(0),
         types.uint(5)
       ], deployer.address)
+    ]);
+    block.receipts[0].result.expectErr(403);
+
+    // Try valid rating from different user
+    block = chain.mineBlock([
+      Tx.contractCall("recipe", "rate-recipe", [
+        types.uint(0),
+        types.uint(5)
+      ], user2.address)
     ]);
     block.receipts[0].result.expectOk();
   },
